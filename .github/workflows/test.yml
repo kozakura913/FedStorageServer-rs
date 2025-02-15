@@ -10,10 +10,6 @@ jobs:
 
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: test
-
     steps:
     - name: Checkout
       uses: actions/checkout@v4
