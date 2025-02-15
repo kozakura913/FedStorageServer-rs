@@ -1,0 +1,72 @@
+name: fmt
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+jobs:
+  test:
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      pull-requests: write
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: copy
+      run: cp src src_actual
+
+    - name: Run format
+      run: cargo fmt
+
+    - name: check format changes
+      id: check-changes
+      run: |
+        diff -r -u --label=format --label=on-tree ./src ./src_actual > format.diff || true
+        if [ -s format.diff ]; then
+          echo "changes=true" >> $GITHUB_OUTPUT
+        else
+          echo "changes=false" >> $GITHUB_OUTPUT
+        fi
+    - name: Print full diff
+      run: cat ./format.diff
+
+    - name: send message
+      if: steps.check-changes.outputs.changes == 'true'
+      uses: thollander/actions-comment-pull-request@v2
+      with:
+        comment_tag: check-cargofmt
+        message: |-
+          Thank you for sending us a great Pull Request! 👍
+          Please run auto format 🙏
+          example:
+          ```sh
+          cargo fmt
+          ```
+    - name: send message
+      if: steps.check-changes.outputs.changes == 'false'
+      uses: thollander/actions-comment-pull-request@v2
+      with:
+        comment_tag: check-cargofmt
+        mode: delete
+        message: "Thank you!"
+        create_if_not_exists: false
+
+    - name: Make failure if changes are detected
+      if: steps.check-changes.outputs.changes == 'true'
+      run: exit 1
