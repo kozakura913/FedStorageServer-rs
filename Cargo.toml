@@ -1,10 +1,11 @@
 [package]
 name = "FedStorageServer-rs"
-version = "0.1.0"
+version = "0.6.0"
 edition = "2021"
 
 [dependencies]
-chrono = "0.4.39"
+async-compression = { version =  "0.4", features = ["gzip","tokio"] }
+chrono = "0.4"
 num-derive = "0.4.2"
 num-traits = "0.2.19"
-tokio = { version = "^1.43", features = ["rt-multi-thread","net","sync","io-util"] }
+tokio = { version = "1", features = ["rt-multi-thread","net","sync","io-util"] }
