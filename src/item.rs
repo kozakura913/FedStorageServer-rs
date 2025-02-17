@@ -8,6 +8,7 @@ use tokio::{
 use crate::{client::ClientSession, read_string, write_string};
 
 const ITEM_BUFFER_LIMIT: usize = 100;
+
 #[derive(Clone, Debug)]
 pub struct Items {
 	data: Arc<RwLock<Vec<ItemStack>>>,
