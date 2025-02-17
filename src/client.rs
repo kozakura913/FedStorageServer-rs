@@ -22,19 +22,18 @@ pub(crate) struct ClientSession{
 
 #[derive(FromPrimitive, ToPrimitive,Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 #[repr(i8)]
-#[allow(non_camel_case_types)]
 enum Command{
-	DATA_NOP = -1,
-	DATA_FREQUENCY = 1,
-	DATA_ITEM_RECEIVE = 2,
-	DATA_ITEM_SEND = 3,
-	DATA_FLUID_RECEIVE = 4,
-	DATA_FLUID_SEND = 5,
-	DATA_ENERGY_RECEIVE = 6,
-	DATA_ENERGY_SEND = 7,
-	DATA_HOST_NAME = 8,
-	DATA_PACK_START = 9,
-	DATA_PACK_END = 10,
+	NOP = -1,
+	SetFrequency = 1,
+	ItemFromClient = 2,
+	ItemToClient = 3,
+	FluidFromClient = 4,
+	FluidToClient = 5,
+	EnergyFromClient = 6,
+	EnergyToClient = 7,
+	SetHostName = 8,
+	PackStart = 9,
+	PackEnd = 10,
 }
 
 impl ClientSession{
@@ -55,36 +54,42 @@ impl ClientSession{
 		loop{
 			let command=self.reader.read_i8().await?;
 			match Command::from_i8(command){
-				Some(Command::DATA_NOP)=>{
+				Some(Command::NOP)=>{
 					//NOP
 				},
-				Some(Command::DATA_HOST_NAME)=>{
+				Some(Command::SetHostName)=>{
 					self.hostname=read_string(&mut self.reader).await?;
 				},
-				Some(Command::DATA_PACK_START)=>{
+				Some(Command::PackStart)=>{
 					self.pack_start=chrono::Utc::now();
 				},
-				Some(Command::DATA_PACK_END)=>{
+				Some(Command::PackEnd)=>{
 					self.last_sync_time=(chrono::Utc::now()-self.pack_start).num_milliseconds();
 				},
-				Some(Command::DATA_FREQUENCY)=>{
+				Some(Command::SetFrequency)=>{
 					self.freq=Some(Frequency(read_string(&mut self.reader).await?));
 				},
-				Some(Command::DATA_ENERGY_SEND)=>{
+				Some(Command::EnergyToClient)=>{
 					self.energy_send().await?;
 				},
-				Some(Command::DATA_ENERGY_RECEIVE)=>{
+				Some(Command::EnergyFromClient)=>{
 					self.energy_recv().await?;
 				},
-				Some(Command::DATA_ITEM_SEND)=>{
+				Some(Command::ItemToClient)=>{
 					self.item_send().await?;
 				},
-				Some(Command::DATA_ITEM_RECEIVE)=>{
+				Some(Command::ItemFromClient)=>{
 					self.item_recv().await?;
 				},
-				command=>{
+				Some(Command::FluidToClient)=>{
+					self.fluid_send().await?;
+				},
+				Some(Command::FluidFromClient)=>{
+					self.fluid_recv().await?;
+				},
+				None=>{
 					//謎
-					println!("unknown command {:?}",command);
+					println!("unknown command {}",command);
 					break;
 				}
 			}

@@ -4,11 +4,13 @@ use std::{
 };
 
 use client::ClientSession;
+use fluid::Fluids;
 use item::Items;
 use tokio::{io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt}, net::TcpListener, sync::RwLock};
 
 mod energy;
 mod item;
+mod fluid;
 mod client;
 
 fn main() {
@@ -21,6 +23,7 @@ fn main() {
 			let listener = bind.expect("bind error");
 			let go=Arc::new(GlobalObject{
 				item_buffers: RwLock::new(HashMap::new()),
+				fluid_buffers: RwLock::new(HashMap::new()),
 				energy_buffers: RwLock::new(HashMap::new()),
 			});
 			loop{
@@ -48,6 +51,7 @@ async fn tcp_loop(listener: &TcpListener,go:Arc<GlobalObject>){
 pub struct Frequency(pub String);
 struct GlobalObject {
 	item_buffers: RwLock<HashMap<Frequency, Arc<Items>>>,
+	fluid_buffers: RwLock<HashMap<Frequency, Arc<Fluids>>>,
 	energy_buffers: RwLock<HashMap<Frequency, i64>>,
 }
 pub async fn read_string<R:AsyncRead + std::marker::Unpin>(reader:&mut R)->Result<String,tokio::io::Error>{

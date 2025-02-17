@@ -87,7 +87,12 @@ impl ClientSession{
 			let is=ItemStack::read(&mut reader).await?;
 			insert_items.push(is);
 		}
-		let freq_buffer={
+		let cache_hit={
+			self.go.item_buffers.read().await.get(self.freq()).cloned()
+		};
+		let freq_buffer=if let Some(cache_hit)=cache_hit{
+			cache_hit
+		}else{
 			let mut item_buffers=self.go.item_buffers.write().await;
 			let freq_buffer=item_buffers.get(self.freq()).cloned();
 			match freq_buffer{
@@ -174,17 +179,12 @@ mod tests {
 			let take_items=items.take_items(ITEM_BUFFER_LIMIT as i32).await;
 			assert_eq!(take_items.len(),ITEM_BUFFER_LIMIT-5);
 			assert_eq!(items.data.read().await.len(),0);
-			assert_eq!(old,take_items)
+			assert_eq!(old,take_items);
 		});
 	}
 	#[test]
 	fn read_write_item(){
-		let src=ItemStack{
-			id:"minecraft:stone".into(),
-			damage:0,
-			count:64,
-			nbt:Some(vec![0,1,2,3]),
-		};
+		let src=ItemStack::dummy();
 		tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async{
 			let mut v=Vec::new();
 			src.write(&mut v).await.unwrap();
