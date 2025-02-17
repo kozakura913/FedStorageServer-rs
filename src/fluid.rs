@@ -10,7 +10,7 @@ use crate::{read_string, to_hex_string, write_string, ClientSession};
 //const FLUID_BUFFER_LIMIT:i64=i32::MAX as i64;//reject機能実装する時に使う
 #[derive(Clone, Debug)]
 pub struct Fluids {
-	data: Arc<RwLock<HashMap<FluidId, FluidStack>>>,
+	pub(crate) data: Arc<RwLock<HashMap<FluidId, FluidStack>>>,
 }
 impl Fluids {
 	pub(crate) fn new() -> Self {
@@ -49,9 +49,12 @@ impl Fluids {
 		}
 		data.insert(stack.id.clone(), stack);
 	}
+	pub async fn len(&self) -> usize {
+		self.data.read().await.len()
+	}
 }
 #[derive(Clone, Debug, Hash, Eq, PartialEq, PartialOrd)]
-struct FluidId(String);
+pub struct FluidId(String);
 impl FluidId {
 	fn new(mut name: String, nbt: Option<impl AsRef<[u8]>>) -> Self {
 		if let Some(nbt) = nbt {
@@ -65,7 +68,7 @@ impl FluidId {
 	}
 }
 #[derive(Clone, Debug, Hash, Eq, PartialEq, PartialOrd)]
-struct FluidStack {
+pub struct FluidStack {
 	pub(crate) id: FluidId, //name+nbt_hash
 	pub(crate) name: String,
 	pub(crate) count: i64,

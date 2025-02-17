@@ -5,9 +5,14 @@ edition = "2021"
 
 [dependencies]
 async-compression = { version =  "0.4", features = ["gzip","tokio"] }
+axum = "0.8.1"
 chrono = "0.4"
+futures = "0.3.31"
 md-5 = "0.10.6"
 num-derive = "0.4.2"
 num-traits = "0.2.19"
-tokio = { version = "1", features = ["rt-multi-thread","net","sync","io-util"] }
-uuid = { version = "1.13.1", features = ["v4"] }
+serde = { version = "^1.0.217",features=["derive"]}
+serde_json = "1.0.138"
+tokio = { version = "1", features = ["rt-multi-thread","net","sync","io-util","signal"] }
+tower-http = { version = "0.6.2", features = ["fs"] }
+uuid = { version = "1.13.1" , features = ["v4"] }
