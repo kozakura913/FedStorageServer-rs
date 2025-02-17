@@ -11,7 +11,7 @@ const ITEM_BUFFER_LIMIT: usize = 100;
 
 #[derive(Clone, Debug)]
 pub struct Items {
-	data: Arc<RwLock<Vec<ItemStack>>>,
+	pub(crate) data: Arc<RwLock<Vec<ItemStack>>>,
 }
 impl Items {
 	pub(crate) fn new() -> Self {
@@ -36,10 +36,10 @@ impl Items {
 }
 #[derive(Clone, Debug, Hash, Eq, PartialEq, PartialOrd)]
 pub struct ItemStack {
-	damage: i32,
-	count: i32,
-	id: String,
-	nbt: Option<Vec<u8>>,
+	pub(crate) damage: i32,
+	pub(crate) count: i32,
+	pub(crate) id: String,
+	pub(crate) nbt: Option<Vec<u8>>,
 }
 impl ItemStack {
 	async fn read<R: AsyncRead + std::marker::Unpin>(r: &mut R) -> Result<Self, tokio::io::Error> {

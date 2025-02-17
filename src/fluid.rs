@@ -5,7 +5,7 @@ use tokio::{
 	sync::RwLock,
 };
 
-use crate::{read_string, write_string, ClientSession};
+use crate::{read_string, to_hex_string, write_string, ClientSession};
 
 //const FLUID_BUFFER_LIMIT:i64=i32::MAX as i64;//reject機能実装する時に使う
 #[derive(Clone, Debug)]
@@ -59,21 +59,17 @@ impl FluidId {
 			let mut hasher = md5::Md5::new();
 			hasher.update(nbt);
 			let result = hasher.finalize();
-			let result = result
-				.iter()
-				.map(|n| format!("{:02X}", n))
-				.collect::<String>();
-			name += &result;
+			name += &to_hex_string(&result);
 		}
 		Self(name)
 	}
 }
 #[derive(Clone, Debug, Hash, Eq, PartialEq, PartialOrd)]
 struct FluidStack {
-	id: FluidId, //name+nbt_hash
-	name: String,
-	count: i64,
-	nbt: Option<Vec<u8>>,
+	pub(crate) id: FluidId, //name+nbt_hash
+	pub(crate) name: String,
+	pub(crate) count: i64,
+	pub(crate) nbt: Option<Vec<u8>>,
 }
 impl FluidStack {
 	async fn read<R: AsyncRead + std::marker::Unpin>(r: &mut R) -> Result<Self, tokio::io::Error> {
