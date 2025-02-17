@@ -12,6 +12,7 @@ use tokio::{
 mod client;
 mod energy;
 mod fluid;
+mod http;
 mod item;
 
 fn main() {
@@ -25,13 +26,15 @@ fn main() {
 		energy_buffers: RwLock::new(HashMap::new()),
 		clients: RwLock::new(HashMap::new()),
 	});
-	rt.block_on(async move {
+	let cloned = go.clone();
+	rt.spawn(async move {
 		let bind = TcpListener::bind("0.0.0.0:3030").await;
 		let listener = bind.expect("bind error");
 		loop {
 			tcp_loop(&listener, go.clone()).await;
 		}
 	});
+	rt.block_on(http::server(cloned))
 }
 async fn tcp_loop(listener: &TcpListener, go: Arc<GlobalObject>) {
 	match listener.accept().await {

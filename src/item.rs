@@ -33,6 +33,9 @@ impl Items {
 		let stacks = stacks.drain(0..max_stacks);
 		data.append(&mut stacks.collect());
 	}
+	pub async fn len(&self) -> usize {
+		self.data.read().await.len()
+	}
 }
 #[derive(Clone, Debug, Hash, Eq, PartialEq, PartialOrd)]
 pub struct ItemStack {
