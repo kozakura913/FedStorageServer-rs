@@ -18,7 +18,7 @@ impl Fluids {
 			data: Arc::new(RwLock::new(HashMap::new())),
 		}
 	}
-	async fn take_fluid(&self, mut max_stack: FluidStack) -> Option<FluidStack> {
+	pub async fn take_fluid(&self, mut max_stack: FluidStack) -> Option<FluidStack> {
 		let mut data = self.data.write().await;
 		let store = if max_stack.name.is_empty() {
 			let fs = (data.values_mut().next()?).clone();
@@ -42,7 +42,7 @@ impl Fluids {
 			Some(max_stack)
 		}
 	}
-	async fn insert_fluid(&self, mut stack: FluidStack) {
+	pub async fn insert_fluid(&self, mut stack: FluidStack) {
 		let mut data = self.data.write().await;
 		if let Some(fluid) = data.remove(&stack.id) {
 			stack.count = stack.count.saturating_add(fluid.count);
@@ -75,7 +75,9 @@ pub struct FluidStack {
 	pub(crate) nbt: Option<Vec<u8>>,
 }
 impl FluidStack {
-	async fn read<R: AsyncRead + std::marker::Unpin>(r: &mut R) -> Result<Self, tokio::io::Error> {
+	pub async fn read<R: AsyncRead + std::marker::Unpin>(
+		r: &mut R,
+	) -> Result<Self, tokio::io::Error> {
 		let name = read_string(r).await?; //液体名
 		let count = r.read_i64().await?; //スタックサイズ
 		let nbt_size = r.read_i16().await?;
@@ -93,7 +95,7 @@ impl FluidStack {
 			nbt,
 		})
 	}
-	async fn write<W: AsyncWrite + std::marker::Unpin>(
+	pub async fn write<W: AsyncWrite + std::marker::Unpin>(
 		&self,
 		w: &mut W,
 	) -> Result<(), tokio::io::Error> {

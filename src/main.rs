@@ -9,6 +9,7 @@ use tokio::{
 	sync::{Mutex, RwLock},
 };
 
+mod cli;
 mod client;
 mod energy;
 mod fluid;
@@ -34,6 +35,7 @@ fn main() {
 			tcp_loop(&listener, go.clone()).await;
 		}
 	});
+	rt.spawn(cli::cli(cloned.clone()));
 	rt.block_on(http::server(cloned))
 }
 async fn tcp_loop(listener: &TcpListener, go: Arc<GlobalObject>) {
