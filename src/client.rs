@@ -5,6 +5,7 @@ use num_traits::FromPrimitive;
 use tokio::{
 	io::{AsyncReadExt, AsyncWriteExt},
 	net::TcpStream,
+	sync::Mutex,
 };
 
 use crate::{read_string, Frequency, GlobalObject};
@@ -14,12 +15,16 @@ const CLIENT_VERSION: i64 = 6;
 pub(crate) struct ClientSession {
 	pub(crate) reader: tokio::net::tcp::OwnedReadHalf,
 	pub(crate) writer: tokio::net::tcp::OwnedWriteHalf,
-	addr: std::net::SocketAddr,
-	hostname: String,
 	pack_start: chrono::DateTime<chrono::Utc>,
-	last_sync_time: i64,
 	freq: Option<Frequency>,
+	pub(crate) meta: Arc<Mutex<ClientMeta>>,
 	pub(crate) go: Arc<GlobalObject>,
+}
+pub struct ClientMeta {
+	pub(crate) id: uuid::Uuid,
+	pub(crate) addr: std::net::SocketAddr,
+	pub hostname: String,
+	pub last_sync_time: i64,
 }
 
 #[derive(FromPrimitive, ToPrimitive, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -41,20 +46,32 @@ enum Command {
 impl ClientSession {
 	pub fn new(soc: TcpStream, addr: SocketAddr, go: Arc<GlobalObject>) -> Self {
 		let (reader, writer) = soc.into_split();
+		let meta = Arc::new(Mutex::new(ClientMeta {
+			id: uuid::Uuid::new_v4(),
+			addr,
+			hostname: "DefaultHostName".into(),
+			last_sync_time: 0,
+		}));
 		ClientSession {
 			reader,
 			writer,
-			addr,
-			hostname: "DefaultHostName".into(),
 			pack_start: chrono::Utc::now(),
-			last_sync_time: 0,
 			freq: None,
+			meta,
 			go,
 		}
 	}
 	pub async fn session(mut self) -> Result<(), tokio::io::Error> {
 		self.writer.write_i64(CLIENT_VERSION).await?;
-		println!("start session remote address {}", self.addr);
+		{
+			let mut clients = self.go.clients.write().await;
+			let id = self.meta.lock().await.id;
+			clients.insert(id, self.meta.clone());
+			println!(
+				"start session remote address {}",
+				self.meta.lock().await.addr
+			);
+		}
 		loop {
 			let command = self.reader.read_i8().await?;
 			match Command::from_i8(command) {
@@ -62,13 +79,15 @@ impl ClientSession {
 					//NOP
 				}
 				Some(Command::SetHostName) => {
-					self.hostname = read_string(&mut self.reader).await?;
+					let mut meta = self.meta.lock().await;
+					meta.hostname = read_string(&mut self.reader).await?;
 				}
 				Some(Command::PackStart) => {
 					self.pack_start = chrono::Utc::now();
 				}
 				Some(Command::PackEnd) => {
-					self.last_sync_time = (chrono::Utc::now() - self.pack_start).num_milliseconds();
+					let mut meta = self.meta.lock().await;
+					meta.last_sync_time = (chrono::Utc::now() - self.pack_start).num_milliseconds();
 				}
 				Some(Command::SetFrequency) => {
 					self.freq = Some(Frequency(read_string(&mut self.reader).await?));

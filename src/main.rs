@@ -1,46 +1,54 @@
 use std::{collections::HashMap, sync::Arc};
 
-use client::ClientSession;
+use client::{ClientMeta, ClientSession};
 use fluid::Fluids;
 use item::Items;
 use tokio::{
 	io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
 	net::TcpListener,
-	sync::RwLock,
+	sync::{Mutex, RwLock},
 };
 
+mod cli;
 mod client;
 mod energy;
 mod fluid;
+mod http;
 mod item;
 
 fn main() {
-	tokio::runtime::Builder::new_multi_thread()
+	let rt = tokio::runtime::Builder::new_multi_thread()
 		.enable_all()
 		.build()
-		.expect("async runtime")
-		.block_on(async {
-			let bind = TcpListener::bind("0.0.0.0:3030").await;
-			let listener = bind.expect("bind error");
-			let go = Arc::new(GlobalObject {
-				item_buffers: RwLock::new(HashMap::new()),
-				fluid_buffers: RwLock::new(HashMap::new()),
-				energy_buffers: RwLock::new(HashMap::new()),
-			});
-			loop {
-				tcp_loop(&listener, go.clone()).await;
-			}
-		});
+		.expect("async runtime");
+	let go = Arc::new(GlobalObject {
+		item_buffers: RwLock::new(HashMap::new()),
+		fluid_buffers: RwLock::new(HashMap::new()),
+		energy_buffers: RwLock::new(HashMap::new()),
+		clients: RwLock::new(HashMap::new()),
+	});
+	let cloned = go.clone();
+	rt.spawn(async move {
+		let bind = TcpListener::bind("0.0.0.0:3030").await;
+		let listener = bind.expect("bind error");
+		loop {
+			tcp_loop(&listener, go.clone()).await;
+		}
+	});
+	rt.spawn(cli::cli(cloned.clone()));
+	rt.block_on(http::server(cloned))
 }
 async fn tcp_loop(listener: &TcpListener, go: Arc<GlobalObject>) {
 	match listener.accept().await {
 		Ok((soc, addr)) => {
 			println!("connect");
-			let client = ClientSession::new(soc, addr, go);
-			tokio::runtime::Handle::current().spawn(async {
+			let client = ClientSession::new(soc, addr, go.clone());
+			tokio::runtime::Handle::current().spawn(async move {
+				let sid = client.meta.lock().await.id;
 				if let Err(e) = client.session().await {
 					eprintln!("{:?}", e);
 				}
+				go.clients.write().await.remove(&sid);
 			});
 		}
 		Err(e) => {
@@ -54,6 +62,10 @@ struct GlobalObject {
 	item_buffers: RwLock<HashMap<Frequency, Arc<Items>>>,
 	fluid_buffers: RwLock<HashMap<Frequency, Arc<Fluids>>>,
 	energy_buffers: RwLock<HashMap<Frequency, i64>>,
+	clients: RwLock<HashMap<uuid::Uuid, Arc<Mutex<ClientMeta>>>>,
+}
+pub fn to_hex_string(v: &[u8]) -> String {
+	v.iter().map(|n| format!("{:02X}", n)).collect::<String>()
 }
 pub async fn read_string<R: AsyncRead + std::marker::Unpin>(
 	reader: &mut R,

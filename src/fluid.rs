@@ -5,12 +5,12 @@ use tokio::{
 	sync::RwLock,
 };
 
-use crate::{read_string, write_string, ClientSession};
+use crate::{read_string, to_hex_string, write_string, ClientSession};
 
 //const FLUID_BUFFER_LIMIT:i64=i32::MAX as i64;//reject機能実装する時に使う
 #[derive(Clone, Debug)]
 pub struct Fluids {
-	data: Arc<RwLock<HashMap<FluidId, FluidStack>>>,
+	pub(crate) data: Arc<RwLock<HashMap<FluidId, FluidStack>>>,
 }
 impl Fluids {
 	pub(crate) fn new() -> Self {
@@ -18,7 +18,7 @@ impl Fluids {
 			data: Arc::new(RwLock::new(HashMap::new())),
 		}
 	}
-	async fn take_fluid(&self, mut max_stack: FluidStack) -> Option<FluidStack> {
+	pub async fn take_fluid(&self, mut max_stack: FluidStack) -> Option<FluidStack> {
 		let mut data = self.data.write().await;
 		let store = if max_stack.name.is_empty() {
 			let fs = (data.values_mut().next()?).clone();
@@ -42,16 +42,19 @@ impl Fluids {
 			Some(max_stack)
 		}
 	}
-	async fn insert_fluid(&self, mut stack: FluidStack) {
+	pub async fn insert_fluid(&self, mut stack: FluidStack) {
 		let mut data = self.data.write().await;
 		if let Some(fluid) = data.remove(&stack.id) {
 			stack.count = stack.count.saturating_add(fluid.count);
 		}
 		data.insert(stack.id.clone(), stack);
 	}
+	pub async fn len(&self) -> usize {
+		self.data.read().await.len()
+	}
 }
 #[derive(Clone, Debug, Hash, Eq, PartialEq, PartialOrd)]
-struct FluidId(String);
+pub struct FluidId(String);
 impl FluidId {
 	fn new(mut name: String, nbt: Option<impl AsRef<[u8]>>) -> Self {
 		if let Some(nbt) = nbt {
@@ -59,24 +62,22 @@ impl FluidId {
 			let mut hasher = md5::Md5::new();
 			hasher.update(nbt);
 			let result = hasher.finalize();
-			let result = result
-				.iter()
-				.map(|n| format!("{:02X}", n))
-				.collect::<String>();
-			name += &result;
+			name += &to_hex_string(&result);
 		}
 		Self(name)
 	}
 }
 #[derive(Clone, Debug, Hash, Eq, PartialEq, PartialOrd)]
-struct FluidStack {
-	id: FluidId, //name+nbt_hash
-	name: String,
-	count: i64,
-	nbt: Option<Vec<u8>>,
+pub struct FluidStack {
+	pub(crate) id: FluidId, //name+nbt_hash
+	pub(crate) name: String,
+	pub(crate) count: i64,
+	pub(crate) nbt: Option<Vec<u8>>,
 }
 impl FluidStack {
-	async fn read<R: AsyncRead + std::marker::Unpin>(r: &mut R) -> Result<Self, tokio::io::Error> {
+	pub async fn read<R: AsyncRead + std::marker::Unpin>(
+		r: &mut R,
+	) -> Result<Self, tokio::io::Error> {
 		let name = read_string(r).await?; //液体名
 		let count = r.read_i64().await?; //スタックサイズ
 		let nbt_size = r.read_i16().await?;
@@ -94,7 +95,7 @@ impl FluidStack {
 			nbt,
 		})
 	}
-	async fn write<W: AsyncWrite + std::marker::Unpin>(
+	pub async fn write<W: AsyncWrite + std::marker::Unpin>(
 		&self,
 		w: &mut W,
 	) -> Result<(), tokio::io::Error> {

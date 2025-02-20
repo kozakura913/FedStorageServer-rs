@@ -11,7 +11,7 @@ const ITEM_BUFFER_LIMIT: usize = 100;
 
 #[derive(Clone, Debug)]
 pub struct Items {
-	data: Arc<RwLock<Vec<ItemStack>>>,
+	pub(crate) data: Arc<RwLock<Vec<ItemStack>>>,
 }
 impl Items {
 	pub(crate) fn new() -> Self {
@@ -19,13 +19,13 @@ impl Items {
 			data: Arc::new(RwLock::new(Vec::new())),
 		}
 	}
-	async fn take_items(&self, max_stacks: i32) -> Vec<ItemStack> {
+	pub async fn take_items(&self, max_stacks: i32) -> Vec<ItemStack> {
 		let mut data = self.data.write().await;
 		let max_stacks = data.len().min(max_stacks.max(0) as usize);
 		let stacks = data.drain(0..max_stacks);
 		stacks.collect()
 	}
-	async fn insert_items(&self, stacks: &mut Vec<ItemStack>) {
+	pub async fn insert_items(&self, stacks: &mut Vec<ItemStack>) {
 		let mut data = self.data.write().await;
 		let max_stacks = stacks
 			.len()
@@ -33,16 +33,21 @@ impl Items {
 		let stacks = stacks.drain(0..max_stacks);
 		data.append(&mut stacks.collect());
 	}
+	pub async fn len(&self) -> usize {
+		self.data.read().await.len()
+	}
 }
 #[derive(Clone, Debug, Hash, Eq, PartialEq, PartialOrd)]
 pub struct ItemStack {
-	damage: i32,
-	count: i32,
-	id: String,
-	nbt: Option<Vec<u8>>,
+	pub(crate) damage: i32,
+	pub(crate) count: i32,
+	pub(crate) id: String,
+	pub(crate) nbt: Option<Vec<u8>>,
 }
 impl ItemStack {
-	async fn read<R: AsyncRead + std::marker::Unpin>(r: &mut R) -> Result<Self, tokio::io::Error> {
+	pub async fn read<R: AsyncRead + std::marker::Unpin>(
+		r: &mut R,
+	) -> Result<Self, tokio::io::Error> {
 		let id = read_string(r).await?; //アイテムID
 		let damage = r.read_i32().await?; //ダメージ値
 		let count = r.read_i32().await?; //スタックサイズ
@@ -61,7 +66,7 @@ impl ItemStack {
 			nbt,
 		})
 	}
-	async fn write<W: AsyncWrite + std::marker::Unpin>(
+	pub async fn write<W: AsyncWrite + std::marker::Unpin>(
 		&self,
 		w: &mut W,
 	) -> Result<(), tokio::io::Error> {
