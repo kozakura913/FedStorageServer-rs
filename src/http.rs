@@ -103,7 +103,7 @@ async fn items(
 	let items = {
 		let items = item_buffers.data.read().await;
 		let jobs = items.iter().map(|item| async {
-			let nbt = item.nbt.as_ref().map(|b| to_hex_string(&b));
+			let nbt = item.nbt.as_ref().map(|b| b.hint());
 			ItemStack {
 				name: item.id.clone(),
 				count: item.count,

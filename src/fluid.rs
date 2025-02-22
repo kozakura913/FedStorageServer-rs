@@ -162,10 +162,18 @@ impl ClientSession {
 
 #[cfg(test)]
 mod tests {
-	use super::{FluidStack, Fluids};
-
+	use super::{FluidId, FluidStack, Fluids};
+	impl Fluids {
+		pub async fn to_vec(&self) -> Vec<(FluidId, FluidStack)> {
+			let mut fluids = Vec::new();
+			for (id, fs) in self.data.read().await.iter() {
+				fluids.push((id.clone(), fs.clone()));
+			}
+			fluids
+		}
+	}
 	impl FluidStack {
-		fn dummy() -> Self {
+		pub fn dummy() -> Self {
 			let nbt = Some(vec![0, 1, 2, 3]);
 			let name = "water".to_string();
 			Self {
