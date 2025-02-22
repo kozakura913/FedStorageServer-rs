@@ -10,7 +10,7 @@ use tokio::{
 
 use crate::{read_string, Frequency, GlobalObject};
 
-const CLIENT_VERSION: i64 = 6;
+const CLIENT_VERSION: i64 = 7;
 
 pub(crate) struct ClientSession {
 	pub(crate) reader: tokio::net::tcp::OwnedReadHalf,
