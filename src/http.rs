@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, str::FromStr, sync::Arc};
 
 use axum::{
 	extract::{Query, State},
@@ -21,6 +21,7 @@ pub(crate) async fn server(go: Arc<GlobalObject>) {
 	let app = app.route("/api/list/fluids.json", get(fluids));
 	let app = app.route("/api/list/energy_frequency.json", get(energy_frequency));
 	let app = app.route("/api/list/clients.json", get(clients));
+	let app = app.route("/api/list/client_sync.json", get(client_sync));
 	let app = app.fallback_service(ServeDir::new("html"));
 	let app = app.with_state(go);
 	let listener = tokio::net::TcpListener::bind(http_addr).await.unwrap();
@@ -35,6 +36,10 @@ pub(crate) async fn server(go: Arc<GlobalObject>) {
 #[derive(Debug, Deserialize)]
 struct ParmFreqList {
 	frequency: String,
+}
+#[derive(Debug, Deserialize)]
+struct ParmClientSessions {
+	id: String,
 }
 async fn fluids(
 	State(go): State<Arc<GlobalObject>>,
@@ -198,13 +203,15 @@ async fn clients(State(go): State<Arc<GlobalObject>>) -> Response {
 	struct ClientMeta {
 		name: String,
 		sync: i64,
+		id: String,
 	}
 	let clients = {
-		let jobs = clients.iter().map(|(_id, meta)| async {
+		let jobs = clients.iter().map(|(id, meta)| async {
 			let meta = meta.lock().await;
 			ClientMeta {
 				name: meta.hostname.clone(),
 				sync: meta.last_sync_time,
+				id: id.to_string(),
 			}
 		});
 		futures::future::join_all(jobs)
@@ -213,6 +220,28 @@ async fn clients(State(go): State<Arc<GlobalObject>>) -> Response {
 			.collect::<Vec<_>>()
 	};
 	match serde_json::to_string(&clients) {
+		Ok(json) => (StatusCode::OK, json).into_response(),
+		Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+	}
+}
+async fn client_sync(
+	State(go): State<Arc<GlobalObject>>,
+	Query(params): Query<ParmClientSessions>,
+) -> Response {
+	let id = match uuid::Uuid::from_str(params.id.as_str()) {
+		Ok(id) => id,
+		Err(e) => return (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+	};
+	let client = {
+		let clients = go.clients.read().await;
+		if let Some(client) = clients.get(&id).cloned() {
+			client
+		} else {
+			return StatusCode::NOT_FOUND.into_response();
+		}
+	};
+	let meta = client.lock().await;
+	match serde_json::to_string(&meta.last_freq_access) {
 		Ok(json) => (StatusCode::OK, json).into_response(),
 		Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
 	}

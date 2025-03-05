@@ -3,6 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use client::{ClientMeta, ClientSession};
 use fluid::Fluids;
 use item::Items;
+use serde::{Deserialize, Serialize};
 use tokio::{
 	io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
 	net::TcpListener,
@@ -51,7 +52,7 @@ async fn tcp_loop(listener: &TcpListener, go: Arc<GlobalObject>) {
 		}
 	}
 }
-#[derive(Clone, Debug, Hash, Eq, PartialEq, PartialOrd)]
+#[derive(Deserialize, Serialize, Clone, Debug, Hash, Eq, PartialEq, PartialOrd)]
 pub struct Frequency(pub String);
 struct GlobalObject {
 	item_buffers: RwLock<HashMap<Frequency, Arc<Items>>>,
@@ -126,13 +127,12 @@ mod tests {
 				crate::Frequency("WHITE, WHITE, WHITE".into()),
 				u32::MAX as i64 + 500,
 			);
-			let mut go = Self {
+			Self {
 				item_buffers: RwLock::new(item_buffers),
 				fluid_buffers: RwLock::new(fluid_buffers),
 				energy_buffers: RwLock::new(energy_buffers),
 				clients: RwLock::new(HashMap::new()),
-			};
-			go
+			}
 		}
 	}
 	#[test]
